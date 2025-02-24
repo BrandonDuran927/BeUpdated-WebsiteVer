@@ -8,22 +8,21 @@ const Login: React.FC = () => {
     const [errorMessage, setErrorMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const { login, isAuthenticated, error } = useContext(AuthContext);
+    const authContext = useContext(AuthContext);
     const navigate = useNavigate();
 
+    if (!authContext) {
+        throw new Error("Auth context must be used within an AuthProvider");
+    }
+
+    const { user, loginUser } = authContext;
+    const isAuthenticated = !!user;
+
     useEffect(() => {
-        // If user is already authenticated, redirect to home
         if (isAuthenticated) {
             navigate('/');
         }
     }, [isAuthenticated, navigate]);
-
-    useEffect(() => {
-        // Update local error message when context error changes
-        if (error) {
-            setErrorMessage(error);
-        }
-    }, [error]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -37,13 +36,10 @@ const Login: React.FC = () => {
         setIsLoading(true);
 
         try {
-            const success = await login(email, password);
-
-            if (success) {
-                navigate('/');
-            }
-        } catch (err) {
-            setErrorMessage('An unexpected error occurred. Please try again.');
+            await loginUser(email, password);
+            navigate('/');
+        } catch (err: any) {
+            setErrorMessage(err.message || 'Invalid credentials. Please try again.');
         } finally {
             setIsLoading(false);
         }

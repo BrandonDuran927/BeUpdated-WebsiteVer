@@ -7,6 +7,7 @@ import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { OrderProvider } from './context/OrderContext';
 
+// App.tsx
 function App() {
   return (
     <AuthProvider>

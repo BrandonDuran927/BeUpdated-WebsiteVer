@@ -1,120 +1,127 @@
-import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
-import CartContext from './CartContext';
+import React, { createContext, ReactNode, useEffect, useState, useContext } from "react";
+import { firestore } from "../config/firebase";
+import { collection, addDoc, doc, updateDoc, onSnapshot } from "firebase/firestore";
+import AuthContext from "./AuthContext";
+import { getDoc } from "firebase/firestore";
 
-export type OrderStatus = 'Pending' | 'Completed' | 'Cancelled';
 
 export interface OrderItem {
-    productId: number;
-    name: string;
-    price: number;
+    productId: string;
+    productName: string;
+    productPrice: number;
+    productSize?: string;
+    productColor?: string;
     quantity: number;
-    selectedSize?: string;
-    selectedColor?: string;
-    imageUrl: string;
+    savedAt: string;
+    approval: boolean;
+    status: "pending" | "cancelled" | "completed";
+    updatedAt: string;
 }
 
 export interface Order {
-    id: string;
-    items: OrderItem[];
-    total: number;
-    status: OrderStatus;
-    createdAt: string;
-    paymentMethod: 'VISA' | 'GCASH';
+    id?: string;
+    userId: string;
+    products: OrderItem[];
+    timestamp: number;
+    paymentMethod: "GCASH" | "Mastercard";
 }
 
 interface OrderContextType {
     orders: Order[];
-    addOrder: (paymentMethod: 'VISA' | 'GCASH') => string;
-    getOrderById: (id: string) => Order | undefined;
-    updateOrderStatus: (id: string, status: OrderStatus, productId?: number) => void;
+    placeOrder: (userId: string, orderData: Order) => Promise<string>;
+    updateOrderStatus: (orderId: string, productId: string, status: "pending" | "cancelled" | "completed") => Promise<void>;
 }
 
-const OrderContext = createContext<OrderContextType>({
-    orders: [],
-    addOrder: () => '',
-    getOrderById: () => undefined,
-    updateOrderStatus: () => { }
-});
+const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-interface OrderProviderProps {
-    children: ReactNode;
-}
-
-export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
+export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [orders, setOrders] = useState<Order[]>([]);
-    const { cartItems, getCartTotal, clearCart } = useContext(CartContext);
+    const authContext = useContext(AuthContext);
 
+    if (!authContext) {
+        return <p>Loading...</p>;
+    }
+
+    const { user } = authContext;
+    const userId = user ? user.uid : null;
+
+    // 🔹 Listen for real-time updates on orders
     useEffect(() => {
-        // Load orders from localStorage on mount
-        const savedOrders = localStorage.getItem('orders');
-        if (savedOrders) {
-            setOrders(JSON.parse(savedOrders));
+        if (!userId) return;
+
+        const ordersRef = collection(firestore, `users/${userId}/orders`);
+
+        // ✅ Subscribe to Firestore changes
+        const unsubscribe = onSnapshot(ordersRef, (snapshot) => {
+            const updatedOrders: Order[] = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+            })) as Order[];
+
+            setOrders(updatedOrders);
+            console.log("📦 Orders updated in real-time:", updatedOrders);
+        });
+
+        return () => unsubscribe();
+    }, [userId]);
+
+    const placeOrder = async (userId: string, orderData: Order): Promise<string> => {
+        try {
+            const ordersRef = collection(firestore, `users/${userId}/orders`);
+            const docRef = await addDoc(ordersRef, orderData);
+
+            console.log("✅ Order successfully placed with ID:", docRef.id);
+            return docRef.id;
+        } catch (error) {
+            console.error("❌ Error placing order:", error);
+            throw new Error("Failed to place order");
         }
-    }, []);
-
-    useEffect(() => {
-        // Save orders to localStorage whenever it changes
-        localStorage.setItem('orders', JSON.stringify(orders));
-    }, [orders]);
-
-    const addOrder = (paymentMethod: 'VISA' | 'GCASH'): string => {
-        if (cartItems.length === 0) return '';
-
-        const orderItems: OrderItem[] = cartItems.map(item => ({
-            productId: item.productId,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            selectedSize: item.selectedSize,
-            selectedColor: item.selectedColor,
-            imageUrl: item.imageUrl
-        }));
-
-        const newOrder: Order = {
-            id: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            items: orderItems,
-            total: getCartTotal(),
-            status: 'Pending',
-            createdAt: new Date().toISOString(),
-            paymentMethod
-        };
-
-        setOrders([...orders, newOrder]);
-        clearCart();
-
-        return newOrder.id;
     };
 
-    const getOrderById = (id: string): Order | undefined => {
-        return orders.find(order => order.id === id);
-    };
+    const updateOrderStatus = async (
+        orderId: string,
+        productId: string,
+        newStatus: "pending" | "cancelled" | "completed"
+    ) => {
+        try {
+            if (!userId) {
+                console.error("❌ No user ID found.");
+                return;
+            }
 
-    const updateOrderStatus = (orderId: string, status: OrderStatus, productId?: number): void => {
-        setOrders(
-            orders.map(order => {
-                if (order.id === orderId) {
-                    return {
-                        ...order,
-                        items: order.items.map(item =>
-                            productId && item.productId === productId ? { ...item, status: "Cancelled" } : item
-                        ),
-                    };
-                }
-                return order;
-            })
-        );
+            const orderRef = doc(firestore, `users/${userId}/orders/${orderId}`);
+
+            const orderSnap = await getDoc(orderRef);
+
+            if (!orderSnap.exists()) {
+                console.error("❌ Order not found in Firestore.");
+                return;
+            }
+
+            const orderData = orderSnap.data() as Order;
+
+            const updatedProducts = orderData.products.map(product =>
+                product.productId === productId
+                    ? {
+                        ...product,
+                        status: newStatus,
+                        approval: newStatus !== "cancelled",
+                        updatedAt: new Date().toISOString(),
+                    }
+                    : product
+            );
+
+            await updateDoc(orderRef, { products: updatedProducts });
+
+            console.log(`✅ Updated product ${productId} in order ${orderId} to status: ${newStatus}`);
+        } catch (error) {
+            console.error("❌ Error updating order status:", error);
+        }
     };
 
 
     return (
-        <OrderContext.Provider
-            value={{
-                orders,
-                addOrder,
-                getOrderById,
-                updateOrderStatus
-            }}
-        >
+        <OrderContext.Provider value={{ orders, placeOrder, updateOrderStatus }}>
             {children}
         </OrderContext.Provider>
     );

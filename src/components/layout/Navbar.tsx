@@ -3,13 +3,26 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthContext from '../../context/AuthContext';
 import CartContext from '../../context/CartContext';
 import WishlistContext from '../../context/WishlistContext';
+import OrderContext from '../../context/OrderContext'; // ✅ Import OrderContext
 
 const Navbar: React.FC = () => {
-    const { isAuthenticated, user, logout } = useContext(AuthContext);
+    const authContext = useContext(AuthContext);
     const { getItemCount } = useContext(CartContext);
     const { wishlistItems } = useContext(WishlistContext);
+    const orderContext = useContext(OrderContext)
+
+
     const [searchQuery, setSearchQuery] = useState('');
     const navigate = useNavigate();
+
+    if (!authContext || !orderContext) {
+        throw new Error("Auth context must be used within an AuthProvider");
+    }
+
+    const { orders } = orderContext; // ✅ Retrieve orders from OrderContext
+
+    const { user, logoutUser } = authContext;
+    const isAuthenticated = !!user;
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -17,6 +30,9 @@ const Navbar: React.FC = () => {
             navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
         }
     };
+
+    // ✅ Count the number of orders (only show badge for pending orders)
+    const pendingOrdersCount = orders.filter(order => order.products.some(product => product.status === "pending")).length;
 
     return (
         <nav className="navbar navbar-expand-lg navbar-dark fixed-top" style={{ backgroundColor: '#1434A4' }}>
@@ -82,8 +98,13 @@ const Navbar: React.FC = () => {
                                     </Link>
                                 </li>
                                 <li className="nav-item">
-                                    <Link className="nav-link" to="/orders">
+                                    <Link className="nav-link position-relative" to="/orders">
                                         Orders
+                                        {pendingOrdersCount > 0 && ( // ✅ Show badge for pending orders
+                                            <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill" style={{ backgroundColor: '#FEE055', color: '#1434A4' }}>
+                                                {pendingOrdersCount}
+                                            </span>
+                                        )}
                                     </Link>
                                 </li>
                                 <li className="nav-item dropdown">
@@ -95,7 +116,7 @@ const Navbar: React.FC = () => {
                                         data-bs-toggle="dropdown"
                                         aria-expanded="false"
                                     >
-                                        {user?.firstName || 'Profile'}
+                                        {user?.displayName || user?.email?.split('@')[0] || 'Profile'}
                                     </a>
                                     <ul className="dropdown-menu" aria-labelledby="navbarDropdown">
                                         <li>
@@ -107,7 +128,7 @@ const Navbar: React.FC = () => {
                                             <hr className="dropdown-divider" />
                                         </li>
                                         <li>
-                                            <Link className="dropdown-item" to="/login" onClick={logout}>
+                                            <Link className="dropdown-item" to="/login" onClick={logoutUser}>
                                                 Logout
                                             </Link>
                                         </li>

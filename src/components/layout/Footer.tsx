@@ -1,7 +1,18 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
+import AuthContext from '../../context/AuthContext';
+import CartContext from '../../context/CartContext';
+import WishlistContext from '../../context/WishlistContext';
 
 const Footer: React.FC = () => {
+    const authContext = useContext(AuthContext);
+    const cartContext = useContext(CartContext);
+    const wishlistContext = useContext(WishlistContext);
+
+    const { user } = authContext || {}; // Ensure authContext is available
+    const { getItemCount } = cartContext || { getItemCount: () => 0 };
+    const { wishlistItems } = wishlistContext || { wishlistItems: [] };
+
     return (
         <footer className="text-white py-4" style={{ backgroundColor: '#1434A4' }}>
             <div className="container">
@@ -19,8 +30,14 @@ const Footer: React.FC = () => {
                         <ul className="list-unstyled">
                             <li><Link to="/" className="text-white text-decoration-none">Home</Link></li>
                             <li><Link to="/search" className="text-white text-decoration-none">Products</Link></li>
-                            <li><Link to="/orders" className="text-white text-decoration-none">My Orders</Link></li>
-                            <li><Link to="/profile" className="text-white text-decoration-none">My Account</Link></li>
+                            {user && (
+                                <>
+                                    <li><Link to="/orders" className="text-white text-decoration-none">My Orders</Link></li>
+                                    <li><Link to="/profile" className="text-white text-decoration-none">My Account</Link></li>
+                                    <li><Link to="/wishlist" className="text-white text-decoration-none">Wishlist ({wishlistItems.length})</Link></li>
+                                    <li><Link to="/cart" className="text-white text-decoration-none">Cart ({getItemCount()})</Link></li>
+                                </>
+                            )}
                         </ul>
                     </div>
 
@@ -39,7 +56,7 @@ const Footer: React.FC = () => {
                         <p className="small">
                             National University<br />
                             Fairview, Quezon City<br />
-                            Philippines
+                            Philippines<br />
                         </p>
                     </div>
                 </div>
@@ -49,11 +66,6 @@ const Footer: React.FC = () => {
                 <div className="row align-items-center">
                     <div className="col-md-6 small">
                         &copy; {new Date().getFullYear()} National University. All rights reserved.
-                    </div>
-                    <div className="col-md-6 text-md-end">
-                        <a href="#" className="text-white me-2"><i className="bi bi-facebook"></i></a>
-                        <a href="#" className="text-white me-2"><i className="bi bi-twitter"></i></a>
-                        <a href="#" className="text-white me-2"><i className="bi bi-instagram"></i></a>
                     </div>
                 </div>
             </div>

@@ -1,84 +1,124 @@
 import React, { useContext } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import OrderContext from "../context/OrderContext";
+import getImageFilename from "../utils/localStorage";
 
 const Orders: React.FC = () => {
-    const { orders, updateOrderStatus } = useContext(OrderContext);
+    const orderContext = useContext(OrderContext);
+    const navigate = useNavigate();
 
-    // Function to handle individual item cancellation
-    const handleCancelItem = (orderId: string, productId: number, currentStatus: string) => {
-        if (currentStatus === "Completed") {
+    if (!orderContext) {
+        return <p>Loading orders...</p>;
+    }
+
+    const { orders, updateOrderStatus } = orderContext;
+
+    const handleCancelItem = (orderId: string, productId: string, productStatus: string) => {
+        if (productStatus === "completed") {
             alert("You cannot cancel a completed order.");
             return;
         }
-        if (currentStatus === "Cancelled") {
+        if (productStatus === "cancelled") {
             alert("This item has already been cancelled.");
             return;
         }
         if (window.confirm("Are you sure you want to cancel this item?")) {
-            updateOrderStatus(orderId, "Cancelled", productId)
+            updateOrderStatus(orderId, productId, "cancelled");
         }
     };
+
+    // ✅ Sort orders based on the most recent `savedAt` product
+    const sortedOrders = [...orders].sort((a, b) => {
+        const latestProductA = Math.max(...a.products.map(product => new Date(product.savedAt).getTime()));
+        const latestProductB = Math.max(...b.products.map(product => new Date(product.savedAt).getTime()));
+        return latestProductB - latestProductA; // Descending order (newest first)
+    });
 
     return (
         <div className="container py-5">
             <h2 className="mb-4">📦 Your Orders</h2>
 
-            {orders.length === 0 ? (
+            {sortedOrders.length === 0 ? (
                 <p className="text-muted">You haven't placed any orders yet.</p>
             ) : (
                 <div className="list-group">
-                    {orders.map((order) => (
+                    {sortedOrders.map((order) => (
                         <div key={order.id} className="list-group-item p-4 shadow-sm mb-3 rounded">
                             {/* Order Header */}
                             <div className="d-flex justify-content-between align-items-center mb-3">
                                 <h5 className="mb-0">🆔 Order ID: {order.id}</h5>
-                                <span className={`badge ${order.status === "Completed" ? "bg-success" : order.status === "Pending" ? "bg-warning" : "bg-danger"}`}>
-                                    {order.status}
-                                </span>
+                                <span className="badge bg-info">Payment: {order.paymentMethod}</span>
                             </div>
 
                             {/* Order Items */}
-                            {order.items.map((item) => (
-                                <div key={item.productId} className="d-flex align-items-center text-dark mb-3 p-2 border rounded">
-                                    {/* Product Image */}
-                                    <img
-                                        src={item.imageUrl}
-                                        alt={item.name}
-                                        style={{ width: "70px", height: "70px", borderRadius: "5px", marginRight: "15px" }}
-                                    />
+                            {order.products
+                                .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()) // ✅ Sort products inside each order
+                                .map((item) => (
+                                    <div key={item.productId} className="d-flex align-items-center text-dark mb-3 p-2 border rounded">
+                                        <img
+                                            src={`/public/images/products/${getImageFilename(item.productName)}` || "/default-image.png"}
+                                            alt={item.productName}
+                                            style={{ width: "70px", height: "70px", borderRadius: "5px", marginRight: "15px" }}
+                                        />
 
-                                    {/* Product Details */}
-                                    <div className="flex-grow-1">
-                                        <h6 className="mb-1">{item.name}</h6>
-                                        {item.selectedSize && <p className="mb-0"><strong>Size:</strong> {item.selectedSize}</p>}
-                                        {item.selectedColor && (
+                                        <div className="flex-grow-1">
+                                            <h6 className="mb-1">{item.productName}</h6>
+                                            {item.productSize && <p className="mb-0"><strong>Size:</strong> {item.productSize}</p>}
+                                            {item.productColor && (
+                                                <p className="mb-0">
+                                                    <strong>Color:</strong>{" "}
+                                                    <span style={{
+                                                        backgroundColor: item.productColor === "Black" ? "gray" : item.productColor,
+                                                        padding: "3px 10px",
+                                                        borderRadius: "5px"
+                                                    }}>{item.productColor}</span>
+                                                </p>
+                                            )}
+                                            <p className="mb-0"><strong>Quantity:</strong> {item.quantity}</p>
+
+                                            {/* 🔹 Status Indicator */}
                                             <p className="mb-0">
-                                                <strong>Color:</strong>{" "}
-                                                <span style={{
-                                                    backgroundColor: item.selectedColor === "Black" ? "gray" : item.selectedColor,
-                                                    padding: "3px 10px",
-                                                    borderRadius: "5px"
-                                                }}>{item.selectedColor}</span>
+                                                <strong>Status:</strong>{" "}
+                                                <span className={`badge ${item.status === "completed" ? "bg-success" : item.status === "pending" ? "bg-warning" : "bg-danger"}`}>
+                                                    {item.status}
+                                                </span>
                                             </p>
+
+                                            {/* 🔹 Display Cancellation or Pickup Time */}
+                                            {item.status !== "pending" && item.updatedAt && (
+                                                <p className="mb-0 text-muted" style={{ fontSize: "0.85rem" }}>
+                                                    {item.status === "cancelled"
+                                                        ? <strong>Cancelled on:</strong>
+                                                        : <strong>Picked up on:</strong>}{" "}
+                                                    {new Date(item.updatedAt).toLocaleString()}
+                                                </p>
+                                            )}
+
+                                            {/* 🔹 Timestamp (Saved At) */}
+                                            <p className="mb-0 text-muted" style={{ fontSize: "0.85rem" }}>
+                                                Ordered on: {new Date(item.savedAt).toLocaleString()}
+                                            </p>
+                                        </div>
+
+                                        {/* 🔹 Cancel Button for Individual Items */}
+                                        {item.status === "pending" && !item.approval && (
+                                            <button
+                                                className="btn btn-danger btn-sm"
+                                                onClick={() => handleCancelItem(order.id!, item.productId, item.status)}
+                                            >
+                                                Cancel Item
+                                            </button>
                                         )}
-                                        <p className="mb-0"><strong>Quantity:</strong> {item.quantity}</p>
                                     </div>
+                                ))
+                            }
 
-                                    {/* Total Price */}
-                                    <p className="fw-bold text-primary me-3">₱{(item.price * item.quantity).toFixed(2)}</p>
-
-                                    {/* Cancel Item Button */}
-                                    {order.status === "Pending" && (
-                                        <button
-                                            className="btn btn-danger btn-sm"
-                                            onClick={() => handleCancelItem(order.id, item.productId, order.status)}
-                                        >
-                                            Cancel Item
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
+                            {/* 🔹 View Order Button */}
+                            <div className="mt-3 text-end">
+                                <button className="btn btn-primary" onClick={() => navigate(`/order/${order.id}`)}>
+                                    View Order Details
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>

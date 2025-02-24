@@ -1,13 +1,14 @@
 import React, { useContext, useState } from "react";
 import CartContext from "../context/CartContext";
 import { useNavigate } from "react-router-dom";
+import getImageFilename from "../utils/localStorage";
 
 const Cart: React.FC = () => {
     const { cartItems, updateCartItemQuantity, removeFromCart } = useContext(CartContext);
     const navigate = useNavigate();
 
     const getUniqueItemId = (item: {
-        productId: number;
+        productId: string;
         selectedSize?: string;
         selectedColor?: string;
     }) => {
@@ -17,7 +18,7 @@ const Cart: React.FC = () => {
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
     const toggleItemSelection = (item: {
-        productId: number;
+        productId: string;
         selectedSize?: string;
         selectedColor?: string;
     }) => {
@@ -38,15 +39,16 @@ const Cart: React.FC = () => {
         }
     };
 
-    const totalPrice = cartItems
-        .filter(item => selectedItems.includes(getUniqueItemId(item)))
-        .reduce((total, item) => total + item.price * item.quantity, 0);
+    // 🔹 Ensure only selected items are passed to Checkout.tsx
+    const selectedProducts = cartItems.filter(item => {
+        const uniqueId = getUniqueItemId(item);
+        return selectedItems.includes(uniqueId);
+    });
+    console.log("🛒 Filtered selectedProducts:", selectedProducts);
 
-    const getSelectedProductIds = () => {
-        return cartItems
-            .filter(item => selectedItems.includes(getUniqueItemId(item)))
-            .map(item => item.productId);
-    };
+
+
+    const totalPrice = selectedProducts.reduce((total, item) => total + item.price * item.quantity, 0);
 
     return (
         <div className="container py-5">
@@ -56,6 +58,7 @@ const Cart: React.FC = () => {
                 <p className="text-muted">Your cart is empty.</p>
             ) : (
                 <>
+                    {/* 🔹 Select All Option */}
                     <div className="mb-3 d-flex justify-content-between align-items-center">
                         <div className="form-check">
                             <input
@@ -74,10 +77,11 @@ const Cart: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* 🔹 Cart Item List */}
                     <div className="list-group">
                         {cartItems.map((item) => (
                             <div key={getUniqueItemId(item)} className="list-group-item d-flex align-items-center">
-                                {/* Selection Checkbox */}
+                                {/* 🔹 Selection Checkbox */}
                                 <div className="form-check me-3">
                                     <input
                                         className="form-check-input"
@@ -88,10 +92,10 @@ const Cart: React.FC = () => {
                                     />
                                 </div>
 
-                                {/* Product Image */}
-                                <img src={item.imageUrl} alt={item.name} style={{ width: "80px", marginRight: "15px" }} />
+                                {/* 🔹 Product Image */}
+                                <img src={`/public/images/products/${getImageFilename(item.name)}`} alt={item.name} style={{ width: "80px", marginRight: "15px" }} />
 
-                                {/* Product Details */}
+                                {/* 🔹 Product Details */}
                                 <div className="flex-grow-1">
                                     <h5>{item.name}</h5>
                                     <p>₱{item.price.toFixed(2)}</p>
@@ -106,10 +110,10 @@ const Cart: React.FC = () => {
                                         </p>
                                     )}
 
-                                    {/* Quantity Selector */}
-                                    <div className="flex-grow-1">
+                                    {/* 🔹 Quantity Selector */}
+                                    <div className="d-flex align-items-center">
                                         <button
-                                            className="btn btn-outline-dark"
+                                            className="btn btn-outline-dark me-2"
                                             onClick={() => updateCartItemQuantity(item.productId, Math.max(1, item.quantity - 1))}
                                             disabled={item.quantity <= 1}
                                         >
@@ -119,7 +123,7 @@ const Cart: React.FC = () => {
                                         <span className="px-3">{item.quantity}</span>
 
                                         <button
-                                            className="btn btn-outline-dark"
+                                            className="btn btn-outline-dark ms-2"
                                             onClick={() => updateCartItemQuantity(item.productId, item.quantity + 1)}
                                         >
                                             <i className="bi bi-plus"></i>
@@ -127,7 +131,7 @@ const Cart: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Remove Button */}
+                                {/* 🔹 Remove Button */}
                                 <button className="btn btn-danger ms-3" onClick={() => removeFromCart(item.productId)}>
                                     <i className="bi bi-trash"></i>
                                 </button>
@@ -135,15 +139,18 @@ const Cart: React.FC = () => {
                         ))}
                     </div>
 
-                    {/* Total Price & Checkout Button */}
+                    {/* 🔹 Total Price & Checkout Button */}
                     <div className="mt-4">
                         <h4>Selected Items Total: ₱{totalPrice.toFixed(2)}</h4>
                         <button
                             className="btn btn-success mt-2"
-                            onClick={() => navigate("/checkout", { state: { selectedItems: getSelectedProductIds() } })}
-                            disabled={selectedItems.length === 0}
+                            onClick={() => {
+                                console.log("📌 Selected Products before navigating:", selectedProducts);
+                                navigate("/checkout", { state: { selectedProducts: [...selectedProducts], isBuyNow: false } });
+                            }}
+                            disabled={selectedProducts.length === 0}
                         >
-                            Checkout Selected Items ({selectedItems.length})
+                            Checkout Selected Items ({selectedProducts.length})
                         </button>
                     </div>
                 </>

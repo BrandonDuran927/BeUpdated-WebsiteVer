@@ -9,14 +9,23 @@ const Register: React.FC = () => {
         middleName: '',
         email: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        studentId: '',
+        phoneNumber: ''
     });
 
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isLoading, setIsLoading] = useState(false);
 
-    const { register, isAuthenticated, error } = useContext(AuthContext);
+    const authContext = useContext(AuthContext);
     const navigate = useNavigate();
+
+    if (!authContext) {
+        throw new Error("Auth context must be used within an AuthProvider");
+    }
+
+    const { user, registerUser } = authContext;
+    const isAuthenticated = !!user;
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -88,26 +97,19 @@ const Register: React.FC = () => {
         setIsLoading(true);
 
         try {
-            const success = await register({
+            await registerUser(formData.email, formData.password, {
                 firstName: formData.firstName,
                 lastName: formData.lastName,
                 middleName: formData.middleName || undefined,
-                email: formData.email,
-                password: formData.password
+                studentId: formData.studentId,
+                phoneNumber: formData.phoneNumber
             });
 
-            if (success) {
-                navigate('/');
-            } else if (error) {
-                setErrors({
-                    ...errors,
-                    form: error
-                });
-            }
-        } catch (err) {
+            navigate('/');
+        } catch (err: any) {
             setErrors({
                 ...errors,
-                form: 'An unexpected error occurred. Please try again.'
+                form: err.message || 'An unexpected error occurred. Please try again.'
             });
         } finally {
             setIsLoading(false);
@@ -199,6 +201,32 @@ const Register: React.FC = () => {
                                             Must use your NU student email (@students.nu-fairview.edu.ph)
                                         </div>
                                     )}
+                                </div>
+
+                                <div className="row">
+                                    <div className="col-md-6 mb-3">
+                                        <label htmlFor="studentId" className="form-label">Student ID</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            id="studentId"
+                                            name="studentId"
+                                            value={formData.studentId}
+                                            onChange={handleChange}
+                                        />
+                                    </div>
+
+                                    <div className="col-md-6 mb-3">
+                                        <label htmlFor="phoneNumber" className="form-label">Phone Number</label>
+                                        <input
+                                            type="tel"
+                                            className="form-control"
+                                            id="phoneNumber"
+                                            name="phoneNumber"
+                                            value={formData.phoneNumber}
+                                            onChange={handleChange}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="mb-3">

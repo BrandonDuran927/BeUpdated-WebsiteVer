@@ -1,23 +1,76 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState, useContext } from "react"
-import { useParams } from "react-router-dom"
-import { getProductById } from "../data/products"
-import WishlistContext from "../context/WishlistContext"
-import CartContext from "../context/CartContext"
-import { useNavigate } from "react-router-dom"
+import type React from "react";
+import { useState, useEffect, useContext } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { doc, getDoc } from "firebase/firestore";
+import { firestore } from "../config/firebase";
+import WishlistContext from "../context/WishlistContext";
+import CartContext from "../context/CartContext";
+import AuthContext from "../context/AuthContext";
 
 const ProductPage: React.FC = () => {
-    const { id } = useParams()
-    const product = getProductById(Number(id))
-    const { addToWishlist } = useContext(WishlistContext)
-    const { addToCart } = useContext(CartContext)
-    const navigate = useNavigate()
+    const { id } = useParams();
+    const { addToWishlist } = useContext(WishlistContext);
+    const { addToCart } = useContext(CartContext);
+    const authContext = useContext(AuthContext);
+    const navigate = useNavigate();
 
-    const [selectedSize, setSelectedSize] = useState<string | undefined>(product?.sizes?.[0])
-    const [selectedColor, setSelectedColor] = useState<string | undefined>(product?.colors?.[0])
-    const [quantity, setQuantity] = useState(1)
+    const [product, setProduct] = useState<any | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [selectedSize, setSelectedSize] = useState<string | undefined>();
+    const [selectedColor, setSelectedColor] = useState<string | undefined>();
+    const [quantity, setQuantity] = useState(1);
+
+    useEffect(() => {
+        if (!id) return;
+
+        const fetchProduct = async () => {
+            try {
+                const productRef = doc(firestore, `products/${id}`);
+                const productSnap = await getDoc(productRef);
+
+                if (productSnap.exists()) {
+                    const fetchedProduct = productSnap.data();
+
+                    // 🔹 Convert size and color to arrays (handling both string and array cases)
+                    const sizes = fetchedProduct.size
+                        ? Array.isArray(fetchedProduct.size)
+                            ? fetchedProduct.size
+                            : [fetchedProduct.size]
+                        : [];
+
+                    const colors = fetchedProduct.color
+                        ? Array.isArray(fetchedProduct.color)
+                            ? fetchedProduct.color
+                            : [fetchedProduct.color]
+                        : [];
+
+                    setProduct({ ...fetchedProduct, sizes, colors });
+
+                    // ✅ Set default selections
+                    setSelectedSize(sizes.length > 0 ? sizes[0] : undefined);
+                    setSelectedColor(colors.length > 0 ? colors[0] : undefined);
+                } else {
+                    console.log("Product not found in Firestore.");
+                    setProduct(null);
+                }
+            } catch (error) {
+                console.error("Error fetching product:", error);
+                setProduct(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProduct();
+    }, [id]);
+
+    if (loading || !authContext) {
+        return <p className="text-center py-5">Loading product...</p>;
+    }
+
+    const { user } = authContext;
 
     if (!product) {
         return (
@@ -26,29 +79,65 @@ const ProductPage: React.FC = () => {
                     <i className="bi bi-exclamation-triangle me-2"></i>
                     Product not found.
                 </div>
-                <button
-                    className="btn btn-primary mt-3"
-                    onClick={() => navigate("/")}
-                >
+                <button className="btn btn-primary mt-3" onClick={() => navigate("/")}>
                     Return to Shop
                 </button>
             </div>
-        )
+        );
     }
 
     const handleQuantityChange = (newQuantity: number) => {
         if (newQuantity >= 1 && newQuantity <= 10) {
-            setQuantity(newQuantity)
+            setQuantity(newQuantity);
         }
-    }
+    };
 
-    const handleAddToCart = () => {
-        addToCart(product, quantity, selectedSize, selectedColor)
-        const shouldCheckout = window.confirm("Added to cart! Would you like to proceed to checkout?")
-        if (shouldCheckout) {
-            navigate("/checkout")
+    const handleAddToCart = async () => {
+        if (!user) {
+            alert("You need to log in first!");
+            navigate("/login");
+            return;
         }
-    }
+
+        try {
+            await addToCart(product, quantity, selectedSize, selectedColor);
+            const shouldCheckout = window.confirm("Added to cart! Would you like to proceed to checkout?");
+            if (shouldCheckout) {
+                navigate("/checkout");
+            }
+        } catch (error) {
+            console.error("Error adding product to cart:", error);
+            alert("Failed to add product to cart. Please try again.");
+        }
+    };
+
+    const handleBuyNow = () => {
+        if (!user) {
+            alert("You need to log in first!");
+            navigate("/login");
+            return;
+        }
+
+        navigate("/checkout", {
+            state: {
+                selectedProducts: [{ // ✅ Ensure it passes a single product as an array
+                    productId: id,
+                    name: product.name,
+                    price: product.price,
+                    selectedSize,
+                    selectedColor,
+                    quantity,
+                }],
+                isBuyNow: true, // ✅ Mark as Buy Now
+            },
+        });
+    };
+
+
+    const handleAddToWishlist = () => {
+        addToWishlist(product, selectedSize, selectedColor);
+        navigate("/wishlist");
+    };
 
     return (
         <div className="container py-5">
@@ -63,32 +152,17 @@ const ProductPage: React.FC = () => {
                 {/* Product Image Gallery */}
                 <div className="col-lg-6">
                     <div className="card border-0 shadow-sm">
-                        <div className="position-relative">
-                            <img
-                                src={product.imageUrl}
-                                alt={product.name}
-                                className="img-fluid rounded"
-                                style={{ objectFit: "cover", height: "400px", width: "100%" }}
-                            />
-                        </div>
-
-                        {/* Thumbnail previews would go here */}
-                        <div className="d-flex justify-content-center mt-3 gap-2">
-                            {[1, 2, 3].map((i) => (
-                                <div
-                                    key={i}
-                                    className="border rounded p-1 cursor-pointer"
-                                    style={{ width: "60px", height: "60px" }}
-                                >
-                                    <img
-                                        src={product.imageUrl}
-                                        alt={`View ${i}`}
-                                        className="img-fluid"
-                                        style={{ objectFit: "cover", height: "100%", width: "100%" }}
-                                    />
-                                </div>
-                            ))}
-                        </div>
+                        <img
+                            src={`/images/products/${id}.png`}
+                            alt={id}
+                            className="img-fluid rounded"
+                            style={{
+                                minHeight: "300px",
+                                maxHeight: "500px",
+                                objectFit: "contain",
+                                width: "100%",
+                            }}
+                        />
                     </div>
                 </div>
 
@@ -96,18 +170,12 @@ const ProductPage: React.FC = () => {
                 <div className="col-lg-6">
                     <div className="card border-0 shadow-sm p-4">
                         <h1 className="h3 fw-bold mb-2">{product.name}</h1>
-
                         <div className="d-flex align-items-center mb-3">
                             <span className="badge bg-success">In Stock</span>
                         </div>
 
                         <div className="mb-4">
                             <h2 className="h1 fw-bold text-primary mb-0">₱{product.price.toFixed(2)}</h2>
-                            {product.oldPrice && (
-                                <span className="text-muted text-decoration-line-through ms-2">
-                                    ₱{product.oldPrice.toFixed(2)}
-                                </span>
-                            )}
                         </div>
 
                         <p className="mb-4">{product.description}</p>
@@ -115,144 +183,86 @@ const ProductPage: React.FC = () => {
                         <hr className="my-4" />
 
                         {/* Size Selection */}
-                        {product.sizes && product.sizes.length > 0 && (
+                        {product.sizes.length > 0 && (
                             <div className="mb-4">
-                                <div className="d-flex align-items-center">
-                                    <label className="form-label fw-bold mb-0 me-3">Size:</label>
-                                    <div className="d-flex flex-wrap gap-2">
-                                        {product.sizes.map((size) => (
-                                            <button
-                                                key={size}
-                                                className={`btn ${selectedSize === size ? "btn-dark" : "btn-outline-dark"}`}
-                                                onClick={() => setSelectedSize(size)}
-                                            >
-                                                {size}
-                                            </button>
-                                        ))}
-                                    </div>
+                                <label className="form-label fw-bold">Size:</label>
+                                <div className="d-flex flex-wrap gap-2">
+                                    {product.sizes.map((size: string) => (
+                                        <button
+                                            key={size}
+                                            className={`btn ${selectedSize === size ? "btn-dark" : "btn-outline-dark"}`}
+                                            onClick={() => setSelectedSize(size)}
+                                        >
+                                            {size}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         )}
 
                         {/* Color Selection */}
-                        {product.colors && product.colors.length > 0 && (
+                        {product.colors.length > 0 && (
                             <div className="mb-4">
-                                <div className="d-flex align-items-center">
-                                    <label className="form-label fw-bold mb-0 me-3">Color:</label>
-                                    <div className="d-flex flex-wrap gap-2">
-                                        {product.colors.map((color) => (
-                                            <button
-                                                key={color}
-                                                className={`btn ${selectedColor === color ? "btn-dark" : "btn-outline-dark"}`}
-                                                onClick={() => setSelectedColor(color)}
-                                                style={{
-                                                    position: "relative",
-                                                    overflow: "hidden"
-                                                }}
-                                            >
-                                                <span
-                                                    className="color-swatch"
-                                                    style={{
-                                                        display: "inline-block",
-                                                        width: "1rem",
-                                                        height: "1rem",
-                                                        backgroundColor: color.toLowerCase(),
-                                                        marginRight: "0.5rem",
-                                                        borderRadius: "50%",
-                                                        border: "1px solid #ddd"
-                                                    }}
-                                                ></span>
-                                                {color}
-                                            </button>
-                                        ))}
-                                    </div>
+                                <label className="form-label fw-bold">Color:</label>
+                                <div className="d-flex flex-wrap gap-2">
+                                    {product.colors.map((color: string) => (
+                                        <button
+                                            key={color}
+                                            className={`btn ${selectedColor === color ? "btn-dark text-white" : "btn-outline-dark"}`}
+                                            onClick={() => setSelectedColor(color)}
+                                            style={{
+                                                borderColor: color.toLowerCase(),
+                                                backgroundColor: selectedColor === color ? color.toLowerCase() : "white",
+                                                color: selectedColor === color ? "white" : "black",
+                                            }}
+                                        >
+                                            {color}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         )}
 
-                        {/* Quantity Selector */}
+                        {/* Quantity Selection */}
                         <div className="mb-4">
-                            <div className="d-flex align-items-center">
-                                <label className="form-label fw-bold mb-0 me-3">Quantity:</label>
-                                <div className="d-flex" style={{ maxWidth: "180px" }}>
-                                    <button
-                                        className="btn btn-outline-dark px-3"
-                                        type="button"
-                                        onClick={() => handleQuantityChange(quantity - 1)}
-                                        disabled={quantity <= 1}
-                                    >
-                                        <i className="bi bi-dash"></i>  {/* Ensure Bootstrap Icons work */}
-                                    </button>
-
-                                    <input
-                                        type="number"
-                                        className="form-control text-center mx-2"
-                                        value={quantity}
-                                        min="1"
-                                        max="10"
-                                        style={{ maxWidth: "50px" }}
-                                        onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
-                                    />
-
-                                    <button
-                                        className="btn btn-outline-dark px-3"
-                                        type="button"
-                                        onClick={() => handleQuantityChange(quantity + 1)}
-                                        disabled={quantity >= 10}
-                                    >
-                                        <i className="bi bi-plus"></i>  {/* Ensure Bootstrap Icons work */}
-                                    </button>
-                                </div>
+                            <label className="form-label fw-bold">Quantity:</label>
+                            <div className="d-flex align-items-center gap-2">
+                                <button
+                                    className="btn btn-outline-dark"
+                                    onClick={() => handleQuantityChange(quantity - 1)}
+                                    disabled={quantity <= 1}
+                                >
+                                    <i className="bi bi-dash"></i>
+                                </button>
+                                <span className="fw-bold px-3">{quantity}</span>
+                                <button
+                                    className="btn btn-outline-dark"
+                                    onClick={() => handleQuantityChange(quantity + 1)}
+                                    disabled={quantity >= 10}
+                                >
+                                    <i className="bi bi-plus"></i>
+                                </button>
                             </div>
-                            <small className="text-muted mt-2 d-block">Maximum 10 items per order</small>
                         </div>
 
 
-                        {/* Action Buttons */}
+                        {/* Buttons */}
                         <div className="d-grid gap-2 mt-4">
-                            <button
-                                className="btn btn-primary btn-lg"
-                                onClick={handleAddToCart}
-                            >
-                                <i className="bi bi-cart-plus me-2"></i>
-                                Add to Cart
+                            <button className="btn btn-primary btn-lg" onClick={handleAddToCart}>
+                                <i className="bi bi-cart-plus me-2"></i> Add to Cart
                             </button>
-
-                            <div className="d-flex gap-2">
-                                <button
-                                    className="btn btn-outline-dark flex-grow-1"
-                                    onClick={() => {
-                                        addToWishlist(product, selectedSize, selectedColor)
-                                        navigate("/wishlist")
-                                    }}
-                                >
-                                    <i className="bi bi-heart me-2"></i>
-                                    Wishlist
-                                </button>
-                                <button
-                                    className="btn btn-success flex-grow-1"
-                                    onClick={() => {
-                                        addToCart(product, quantity, selectedSize, selectedColor)
-                                        navigate("/checkout")
-                                    }}
-                                >
-                                    Buy Now
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Additional Product Info */}
-                        <div className="mt-4 pt-4 border-top">
-                            <div className="d-flex align-items-center">
-                                <i className="bi bi-arrow-return-left me-2 text-success"></i>
-                                <span>30-day return policy</span>
-                            </div>
+                            <button className="btn btn-success btn-lg" onClick={handleBuyNow}>
+                                Buy Now
+                            </button>
+                            <button className="btn btn-outline-dark btn-lg" onClick={handleAddToWishlist}>
+                                <i className="bi bi-heart me-2"></i> Add to Wishlist
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-        </div >
-    )
-}
+        </div>
+    );
+};
 
-export default ProductPage
+export default ProductPage;

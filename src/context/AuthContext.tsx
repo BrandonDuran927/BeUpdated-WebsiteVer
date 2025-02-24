@@ -1,130 +1,64 @@
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
-
-interface User {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-}
+import React, { createContext, useState, useEffect, ReactNode } from "react";
+import { auth, database, ref, set } from "../config/firebase";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from "firebase/auth";
+import { get } from "firebase/database";
 
 interface AuthContextType {
     user: User | null;
-    isAuthenticated: boolean;
-    login: (email: string, password: string) => Promise<boolean>;
-    register: (userData: RegisterData) => Promise<boolean>;
-    logout: () => void;
-    error: string | null;
+    loading: boolean;
+    registerUser: (email: string, password: string, userData: any) => Promise<void>;
+    loginUser: (email: string, password: string) => Promise<void>;
+    logoutUser: () => Promise<void>;
 }
 
-interface RegisterData {
-    email: string;
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-    password: string;
-}
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AuthContext = createContext<AuthContextType>({
-    user: null,
-    isAuthenticated: false,
-    login: async () => false,
-    register: async () => false,
-    logout: () => { },
-    error: null
-});
-
-interface AuthProviderProps {
-    children: ReactNode;
-}
-
-const mockUsers: { [key: string]: { user: User; password: string } } = {
-    'student@students.nu-fairview.edu.ph': {
-        user: {
-            id: '1',
-            email: 'student@students.nu-fairview.edu.ph',
-            firstName: 'John',
-            lastName: 'Doe',
-            middleName: 'Smith'
-        },
-        password: 'Password123!'
-    }
-};
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
-            setIsAuthenticated(true);
-        }
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
     }, []);
 
-    const login = async (email: string, password: string): Promise<boolean> => {
-        setError(null);
+    const registerUser = async (email: string, password: string, userData: any) => {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const userId = userCredential.user.uid;
 
-        const mockUser = mockUsers[email];
-
-        if (mockUser && mockUser.password === password) {
-            setUser(mockUser.user);
-            setIsAuthenticated(true);
-            localStorage.setItem('user', JSON.stringify(mockUser.user));
-            return true;
-        } else {
-            setError('Invalid email or password');
-            return false;
-        }
-    };
-
-    const register = async (userData: RegisterData): Promise<boolean> => {
-        setError(null);
-
-        if (!userData.email.endsWith('@students.nu-fairview.edu.ph')) {
-            setError('Email must be a valid NU student email (@students.nu-fairview.edu.ph)');
-            return false;
-        }
-
-        const newUser = {
-            id: `${Object.keys(mockUsers).length + 1}`,
-            email: userData.email,
+        await set(ref(database, `users/${userId}`), {
+            email,
             firstName: userData.firstName,
             lastName: userData.lastName,
-            middleName: userData.middleName
-        };
+            middleName: userData.middleName || "",
+            id: userData.studentId,
+            phoneNumber: userData.phoneNumber,
+        });
 
-        mockUsers[userData.email] = {
-            user: newUser,
-            password: userData.password
-        };
+        const userRef = ref(database, `users/${userId}`);
+        const snapshot = await get(userRef);
 
-        setUser(newUser);
-        setIsAuthenticated(true);
-        localStorage.setItem('user', JSON.stringify(newUser));
-
-        return true;
+        if (snapshot.exists()) {
+            console.log("User data inserted successfully:", snapshot.val());
+        } else {
+            console.log("No data available for this user.");
+        }
     };
 
-    const logout = () => {
-        setUser(null);
-        setIsAuthenticated(false);
-        localStorage.removeItem('user');
+    const loginUser = async (email: string, password: string) => {
+        await signInWithEmailAndPassword(auth, email, password);
+    };
+
+    const logoutUser = async () => {
+        await signOut(auth);
     };
 
     return (
-        <AuthContext.Provider
-            value={{
-                user,
-                isAuthenticated,
-                login,
-                register,
-                logout,
-                error
-            }}
-        >
+        <AuthContext.Provider value={{ user, loading, registerUser, loginUser, logoutUser }}>
             {children}
         </AuthContext.Provider>
     );
