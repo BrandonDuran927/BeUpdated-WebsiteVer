@@ -1,42 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { firestore } from "../config/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import React, { useState, useContext } from "react";
+import ProductContext, { Product } from "../context/ProductContext"; // ✅ Use ProductContext
 import ProductCard from "../components/common/ProductCard";
 
 const Home: React.FC = () => {
+    const { products } = useContext(ProductContext) || { products: [] }; // ✅ Get real-time products
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
-    const [products, setProducts] = useState<any[]>([]);
-    const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
 
     const categories = ["All", "t-shirts", "accessories", "bags", "uniforms"];
 
-    useEffect(() => {
-        const fetchProducts = async () => {
-            try {
-                const querySnapshot = await getDocs(collection(firestore, "products"));
-                const productsData = querySnapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
-                }));
-                setProducts(productsData);
-                setLoading(false);
-            } catch (error) {
-                console.error("Error fetching products:", error);
-                setLoading(false);
-            }
-        };
-
-        fetchProducts();
-    }, []);
-
-    useEffect(() => {
-        if (selectedCategory === "All") {
-            setFilteredProducts(products);
-        } else {
-            setFilteredProducts(products.filter((p) => p.category.toLowerCase().trim() === selectedCategory));
-        }
-    }, [selectedCategory, products]);
+    // ✅ Filter products based on category
+    const filteredProducts = selectedCategory === "All"
+        ? products
+        : products.filter((p: Product) => p.category.toLowerCase().trim() === selectedCategory);
 
     return (
         <div className="container py-5">
@@ -84,7 +59,7 @@ const Home: React.FC = () => {
             </div>
 
             {/* Products List */}
-            {loading ? (
+            {products.length === 0 ? (
                 <div className="text-center">
                     <div className="spinner-border text-primary" role="status">
                         <span className="visually-hidden">Loading...</span>
@@ -92,7 +67,7 @@ const Home: React.FC = () => {
                 </div>
             ) : filteredProducts.length > 0 ? (
                 <div className="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
-                    {filteredProducts.map((product) => (
+                    {filteredProducts.map((product: Product) => (
                         <div key={product.id} className="col">
                             <ProductCard product={product} />
                         </div>

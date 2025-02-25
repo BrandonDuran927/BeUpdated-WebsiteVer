@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, ReactNode, useContext } from "react";
 import { firestore } from "../config/firebase";
-import { collection, doc, setDoc, getDocs, deleteDoc } from "firebase/firestore";
+import { collection, doc, setDoc, getDocs, deleteDoc, getDoc } from "firebase/firestore";
 import AuthContext from "./AuthContext"; // ✅ Import AuthContext to get logged-in user
 import { Product } from "../data/products";
 
@@ -12,6 +12,7 @@ interface CartItem {
     price: number;
     name: string;
     savedAt: string;
+    stockQuantity: number;
 }
 
 interface CartContextType {
@@ -49,7 +50,6 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     const { user } = authContext;
     const userId = user ? user.uid : null;
 
-    // 🔹 Fetch cart from Firestore when user logs in
     useEffect(() => {
         const fetchCart = async () => {
             if (!userId) return;
@@ -57,16 +57,24 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
             const savedProductsRef = collection(firestore, `users/${userId}/savedProducts`);
             const snapshot = await getDocs(savedProductsRef);
 
-            const fetchedCart: CartItem[] = snapshot.docs.map(doc => ({
-                productId: doc.id,
-                ...doc.data(),
-            })) as CartItem[];
+            const fetchedCart = await Promise.all(snapshot.docs.map(async (docSnap) => {
+                const itemData = docSnap.data() as CartItem;
+                const productRef = doc(firestore, `products/${itemData.productId}`);
+                const productSnap = await getDoc(productRef);
+
+                return {
+                    ...itemData,
+                    stockQuantity: productSnap.exists() ? productSnap.data().stockQuantity : 0,
+                };
+            }));
 
             setCartItems(fetchedCart);
+            console.log("🛒 Updated Cart Items:", fetchedCart);
         };
 
         fetchCart();
     }, [userId]);
+
 
     const addToCart = async (product: Product, quantity: number, selectedSize?: string, selectedColor?: string) => {
         if (!userId) return;
@@ -85,6 +93,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
             selectedSize: selectedSize || '',
             selectedColor: selectedColor || '',
             savedAt: new Date().toISOString(),
+            stockQuantity: product.stockQuantity
         };
 
         console.log(`Firestore Doc ID: ${newProductRef.id}`);

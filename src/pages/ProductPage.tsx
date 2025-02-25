@@ -1,73 +1,39 @@
-"use client";
-
-import type React from "react";
-import { useState, useEffect, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { doc, getDoc } from "firebase/firestore";
-import { firestore } from "../config/firebase";
 import WishlistContext from "../context/WishlistContext";
 import CartContext from "../context/CartContext";
 import AuthContext from "../context/AuthContext";
+import ProductContext, { Product } from "../context/ProductContext"; // ✅ Use correct ProductContext
 
 const ProductPage: React.FC = () => {
     const { id } = useParams();
     const { addToWishlist } = useContext(WishlistContext);
     const { addToCart } = useContext(CartContext);
     const authContext = useContext(AuthContext);
+    const productContext = useContext(ProductContext);
     const navigate = useNavigate();
 
-    const [product, setProduct] = useState<any | null>(null);
-    const [loading, setLoading] = useState(true);
+    // ✅ Fix: Handle case where ProductContext is undefined
+    if (!productContext) {
+        return <p className="text-center py-5">Loading product data...</p>;
+    }
+
+    const { products } = productContext; // ✅ Ensure TypeScript recognizes products
+    const product = products.find((p: Product) => p.id === id);
+
     const [selectedSize, setSelectedSize] = useState<string | undefined>();
     const [selectedColor, setSelectedColor] = useState<string | undefined>();
     const [quantity, setQuantity] = useState(1);
 
     useEffect(() => {
-        if (!id) return;
+        if (product) {
+            setSelectedSize(Array.isArray(product.size) ? product.size[0] : undefined);
+            setSelectedColor(Array.isArray(product.color) ? product.color[0] : undefined);
+        }
+    }, [product]);
 
-        const fetchProduct = async () => {
-            try {
-                const productRef = doc(firestore, `products/${id}`);
-                const productSnap = await getDoc(productRef);
-
-                if (productSnap.exists()) {
-                    const fetchedProduct = productSnap.data();
-
-                    // 🔹 Convert size and color to arrays (handling both string and array cases)
-                    const sizes = fetchedProduct.size
-                        ? Array.isArray(fetchedProduct.size)
-                            ? fetchedProduct.size
-                            : [fetchedProduct.size]
-                        : [];
-
-                    const colors = fetchedProduct.color
-                        ? Array.isArray(fetchedProduct.color)
-                            ? fetchedProduct.color
-                            : [fetchedProduct.color]
-                        : [];
-
-                    setProduct({ ...fetchedProduct, sizes, colors });
-
-                    // ✅ Set default selections
-                    setSelectedSize(sizes.length > 0 ? sizes[0] : undefined);
-                    setSelectedColor(colors.length > 0 ? colors[0] : undefined);
-                } else {
-                    console.log("Product not found in Firestore.");
-                    setProduct(null);
-                }
-            } catch (error) {
-                console.error("Error fetching product:", error);
-                setProduct(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchProduct();
-    }, [id]);
-
-    if (loading || !authContext) {
-        return <p className="text-center py-5">Loading product...</p>;
+    if (!authContext) {
+        return <p className="text-center py-5">Loading authentication...</p>;
     }
 
     const { user } = authContext;
@@ -99,6 +65,11 @@ const ProductPage: React.FC = () => {
             return;
         }
 
+        if (product.stockQuantity === 0) {
+            alert("This product is out of stock!");
+            return;
+        }
+
         try {
             await addToCart(product, quantity, selectedSize, selectedColor);
             const shouldCheckout = window.confirm("Added to cart! Would you like to proceed to checkout?");
@@ -118,21 +89,27 @@ const ProductPage: React.FC = () => {
             return;
         }
 
+        if (product.stockQuantity === 0) {
+            alert("This product is out of stock!");
+            return;
+        }
+
         navigate("/checkout", {
             state: {
-                selectedProducts: [{ // ✅ Ensure it passes a single product as an array
-                    productId: id,
-                    name: product.name,
-                    price: product.price,
-                    selectedSize,
-                    selectedColor,
-                    quantity,
-                }],
-                isBuyNow: true, // ✅ Mark as Buy Now
+                selectedProducts: [
+                    {
+                        productId: id,
+                        name: product.name,
+                        price: product.price,
+                        selectedSize,
+                        selectedColor,
+                        quantity,
+                    },
+                ],
+                isBuyNow: true,
             },
         });
     };
-
 
     const handleAddToWishlist = () => {
         addToWishlist(product, selectedSize, selectedColor);
@@ -170,24 +147,23 @@ const ProductPage: React.FC = () => {
                 <div className="col-lg-6">
                     <div className="card border-0 shadow-sm p-4">
                         <h1 className="h3 fw-bold mb-2">{product.name}</h1>
-                        <div className="d-flex align-items-center mb-3">
+
+                        {/* 🔹 Show Stock Status */}
+                        {product.stockQuantity === 0 ? (
+                            <span className="badge bg-danger">Out of Stock</span>
+                        ) : (
                             <span className="badge bg-success">In Stock</span>
-                        </div>
+                        )}
 
-                        <div className="mb-4">
-                            <h2 className="h1 fw-bold text-primary mb-0">₱{product.price.toFixed(2)}</h2>
-                        </div>
-
+                        <h2 className="h1 fw-bold text-primary mt-3">₱{product.price.toFixed(2)}</h2>
                         <p className="mb-4">{product.description}</p>
 
-                        <hr className="my-4" />
-
                         {/* Size Selection */}
-                        {product.sizes.length > 0 && (
+                        {product.size && Array.isArray(product.size) && product.size.length > 0 && (
                             <div className="mb-4">
                                 <label className="form-label fw-bold">Size:</label>
                                 <div className="d-flex flex-wrap gap-2">
-                                    {product.sizes.map((size: string) => (
+                                    {product.size.map((size: string) => (
                                         <button
                                             key={size}
                                             className={`btn ${selectedSize === size ? "btn-dark" : "btn-outline-dark"}`}
@@ -201,11 +177,11 @@ const ProductPage: React.FC = () => {
                         )}
 
                         {/* Color Selection */}
-                        {product.colors.length > 0 && (
+                        {product.color && Array.isArray(product.color) && product.color.length > 0 && (
                             <div className="mb-4">
                                 <label className="form-label fw-bold">Color:</label>
                                 <div className="d-flex flex-wrap gap-2">
-                                    {product.colors.map((color: string) => (
+                                    {product.color.map((color: string) => (
                                         <button
                                             key={color}
                                             className={`btn ${selectedColor === color ? "btn-dark text-white" : "btn-outline-dark"}`}
@@ -245,17 +221,16 @@ const ProductPage: React.FC = () => {
                             </div>
                         </div>
 
-
                         {/* Buttons */}
                         <div className="d-grid gap-2 mt-4">
-                            <button className="btn btn-primary btn-lg" onClick={handleAddToCart}>
-                                <i className="bi bi-cart-plus me-2"></i> Add to Cart
+                            <button className="btn btn-primary btn-lg" onClick={handleAddToCart} disabled={product.stockQuantity === 0}>
+                                Add to Cart
                             </button>
-                            <button className="btn btn-success btn-lg" onClick={handleBuyNow}>
+                            <button className="btn btn-success btn-lg" onClick={handleBuyNow} disabled={product.stockQuantity === 0}>
                                 Buy Now
                             </button>
                             <button className="btn btn-outline-dark btn-lg" onClick={handleAddToWishlist}>
-                                <i className="bi bi-heart me-2"></i> Add to Wishlist
+                                Add to Wishlist
                             </button>
                         </div>
                     </div>

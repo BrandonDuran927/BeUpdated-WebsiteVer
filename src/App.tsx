@@ -6,20 +6,23 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { OrderProvider } from './context/OrderContext';
+import { ProductProvider } from './context/ProductContext';
 
 // App.tsx
 function App() {
   return (
     <AuthProvider>
-      <CartProvider>
-        <WishlistProvider>
-          <OrderProvider>
-            <div className="App">
-              <AppRoutes />
-            </div>
-          </OrderProvider>
-        </WishlistProvider>
-      </CartProvider>
+      <ProductProvider>
+        <CartProvider>
+          <WishlistProvider>
+            <OrderProvider>
+              <div className="App">
+                <AppRoutes />
+              </div>
+            </OrderProvider>
+          </WishlistProvider>
+        </CartProvider>
+      </ProductProvider>
     </AuthProvider>
   );
 }

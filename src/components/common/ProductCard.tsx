@@ -4,11 +4,9 @@ import { Product } from "../../data/products";
 
 interface ProductCardProps {
     product: Product;
-    isInWishlist: boolean;
-    onWishlistToggle: () => void;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, isInWishlist, onWishlistToggle }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     const { id, name, price, stockQuantity } = product;
 
     const rawColors = product.color ?? [];  // Changed from 'colors' to 'color'

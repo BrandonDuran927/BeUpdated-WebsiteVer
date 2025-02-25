@@ -4,6 +4,7 @@ import OrderContext, { type Order } from "../context/OrderContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import AuthContext from "../context/AuthContext";
 import getImageFilename from "../utils/localStorage";
+import removeFromCart from "../context/CartContext"
 
 interface CheckoutProduct {
     productId: string;
@@ -16,6 +17,7 @@ interface CheckoutProduct {
 
 const Checkout: React.FC = () => {
     const { cartItems, clearCart } = useContext(CartContext);
+    const { removeFromCart } = useContext(CartContext);
     const orderContext = useContext(OrderContext);
     const authContext = useContext(AuthContext);
     const navigate = useNavigate();
@@ -40,6 +42,8 @@ const Checkout: React.FC = () => {
     const userId = user ? user.uid : null;
 
     const handleCheckout = async () => {
+        console.log("📌 Checking out these items:", selectedProducts);
+
         if (!userId) {
             alert("You must be logged in to place an order.");
             return;
@@ -77,13 +81,18 @@ const Checkout: React.FC = () => {
 
         try {
             const orderId = await placeOrder(userId, orderData);
-            if (!isBuyNow) clearCart();
+
+            if (!isBuyNow) {
+                selectedProducts.forEach((item) => removeFromCart(item.productId));
+            }
+
             navigate(`/payment-success/${orderId}`);
         } catch (error) {
             console.error("Error placing order:", error);
             alert("Failed to place order. Please try again.");
         }
     };
+
 
     return (
         <div className="container py-5">
