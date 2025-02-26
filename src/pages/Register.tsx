@@ -83,6 +83,14 @@ const Register: React.FC = () => {
             newErrors.confirmPassword = 'Passwords do not match';
         }
 
+        if (!formData.studentId.trim()) {
+            newErrors.studentId = 'Student ID is required';
+        }
+
+        if (!formData.phoneNumber.trim()) {
+            newErrors.phoneNumber = 'Phone number is required';
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -205,27 +213,35 @@ const Register: React.FC = () => {
 
                                 <div className="row">
                                     <div className="col-md-6 mb-3">
-                                        <label htmlFor="studentId" className="form-label">Student ID</label>
+                                        <label htmlFor="studentId" className="form-label">Student ID*</label>
                                         <input
                                             type="text"
-                                            className="form-control"
+                                            className={`form-control ${errors.studentId ? 'is-invalid' : ''}`}
                                             id="studentId"
                                             name="studentId"
                                             value={formData.studentId}
                                             onChange={handleChange}
+                                            required
                                         />
+                                        {errors.studentId && (
+                                            <div className="invalid-feedback">{errors.studentId}</div>
+                                        )}
                                     </div>
 
                                     <div className="col-md-6 mb-3">
-                                        <label htmlFor="phoneNumber" className="form-label">Phone Number</label>
+                                        <label htmlFor="phoneNumber" className="form-label">Phone Number*</label>
                                         <input
                                             type="tel"
-                                            className="form-control"
+                                            className={`form-control ${errors.phoneNumber ? 'is-invalid' : ''}`}
                                             id="phoneNumber"
                                             name="phoneNumber"
                                             value={formData.phoneNumber}
                                             onChange={handleChange}
+                                            required
                                         />
+                                        {errors.phoneNumber && (
+                                            <div className="invalid-feedback">{errors.phoneNumber}</div>
+                                        )}
                                     </div>
                                 </div>
 

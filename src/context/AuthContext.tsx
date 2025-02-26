@@ -27,27 +27,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, []);
 
     const registerUser = async (email: string, password: string, userData: any) => {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const userId = userCredential.user.uid;
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const userId = userCredential.user.uid;
 
-        await set(ref(database, `users/${userId}`), {
-            email,
-            firstName: userData.firstName,
-            lastName: userData.lastName,
-            middleName: userData.middleName || "",
-            id: userData.studentId,
-            phoneNumber: userData.phoneNumber,
-        });
+            console.log("✅ User registered with UID:", userId);
 
-        const userRef = ref(database, `users/${userId}`);
-        const snapshot = await get(userRef);
+            await set(ref(database, `users/${userId}`), {
+                email,
+                firstName: userData.firstName,
+                lastName: userData.lastName,
+                middleName: userData.middleName || "",
+                id: userData.studentId,
+                phoneNumber: userData.phoneNumber,
+            });
 
-        if (snapshot.exists()) {
-            console.log("User data inserted successfully:", snapshot.val());
-        } else {
-            console.log("No data available for this user.");
+            console.log("✅ User data written to database for UID:", userId);
+
+
+            const userRef = ref(database, `users/${userId}`);
+            const snapshot = await get(userRef);
+
+            if (snapshot.exists()) {
+                console.log("✅ Data successfully written:", snapshot.val());
+            } else {
+                console.error("❌ No data found in the database after writing.");
+            }
+        } catch (error) {
+            console.error("❌ Error during user registration:", error);
         }
     };
+
 
     const loginUser = async (email: string, password: string) => {
         await signInWithEmailAndPassword(auth, email, password);

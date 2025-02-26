@@ -38,12 +38,6 @@ const Search: React.FC = () => {
                         <div key={product.id} className="col">
                             <ProductCard
                                 product={product}
-                                isInWishlist={isInWishlist(product.id)} // ✅ Show wishlist status
-                                onWishlistToggle={() =>
-                                    isInWishlist(product.id)
-                                        ? removeFromWishlist(product.id)
-                                        : addToWishlist(product)
-                                }
                             />
                         </div>
                     ))}

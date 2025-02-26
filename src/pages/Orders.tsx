@@ -86,7 +86,7 @@ const Orders: React.FC = () => {
 
                                             {/* 🔹 Display Cancellation or Pickup Time */}
                                             {item.status !== "pending" && item.updatedAt && (
-                                                <p className="mb-0 text-muted" style={{ fontSize: "0.85rem" }}>
+                                                <p className="mb-0" style={{ fontSize: "0.85rem" }}>
                                                     {item.status === "cancelled"
                                                         ? <strong>Cancelled on:</strong>
                                                         : <strong>Picked up on:</strong>}{" "}
@@ -95,8 +95,8 @@ const Orders: React.FC = () => {
                                             )}
 
                                             {/* 🔹 Timestamp (Saved At) */}
-                                            <p className="mb-0 text-muted" style={{ fontSize: "0.85rem" }}>
-                                                Ordered on: {new Date(item.savedAt).toLocaleString()}
+                                            <p className="mb-0" style={{ fontSize: "0.85rem" }}>
+                                                <strong>Ordered on:</strong> {new Date(item.savedAt).toLocaleString()}
                                             </p>
                                         </div>
 

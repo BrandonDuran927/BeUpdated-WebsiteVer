@@ -16,7 +16,6 @@ interface CheckoutProduct {
 }
 
 const Checkout: React.FC = () => {
-    const { cartItems, clearCart } = useContext(CartContext);
     const { removeFromCart } = useContext(CartContext);
     const orderContext = useContext(OrderContext);
     const authContext = useContext(AuthContext);
@@ -42,8 +41,6 @@ const Checkout: React.FC = () => {
     const userId = user ? user.uid : null;
 
     const handleCheckout = async () => {
-        console.log("📌 Checking out these items:", selectedProducts);
-
         if (!userId) {
             alert("You must be logged in to place an order.");
             return;

@@ -59,7 +59,6 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             })) as Order[];
 
             setOrders(updatedOrders);
-            console.log("📦 Orders updated in real-time:", updatedOrders);
         });
 
         return () => unsubscribe();
@@ -70,13 +69,31 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             const ordersRef = collection(firestore, `users/${userId}/orders`);
             const docRef = await addDoc(ordersRef, orderData);
 
-            console.log("✅ Order successfully placed with ID:", docRef.id);
+            const batch = orderData.products.map(async (item) => {
+                const productRef = doc(firestore, `products/${item.productId}`);
+                const productSnap = await getDoc(productRef);
+
+                if (productSnap.exists()) {
+                    const productData = productSnap.data();
+                    const currentStock = productData.stockQuantity || 0;
+                    const newStock = Math.max(currentStock - item.quantity, 0); // Ensure stock is never negative
+
+                    await updateDoc(productRef, { stockQuantity: newStock });
+                    console.log(`📉 Deducted ${item.quantity} from ${item.productName}. New stock: ${newStock}`);
+                } else {
+                    console.warn(`⚠ Product ${item.productName} not found in Firestore.`);
+                }
+            });
+
+            await Promise.all(batch);
+
             return docRef.id;
         } catch (error) {
             console.error("❌ Error placing order:", error);
             throw new Error("Failed to place order");
         }
     };
+
 
     const updateOrderStatus = async (
         orderId: string,
