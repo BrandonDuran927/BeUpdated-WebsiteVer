@@ -9,8 +9,8 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     const { id, name, price, stockQuantity } = product;
 
-    const rawColors = product.color ?? [];  // Changed from 'colors' to 'color'
-    const rawSizes = product.size ?? [];    // Changed from 'sizes' to 'size'
+    const rawColors = product.color ?? [];
+    const rawSizes = product.size ?? [];
 
     const colorList: string[] = Array.isArray(rawColors) ? [...new Set(rawColors)] : rawColors ? [rawColors] : [];
     const sizeList: string[] = Array.isArray(rawSizes) ? [...new Set(rawSizes)] : rawSizes ? [rawSizes] : [];

@@ -4,7 +4,6 @@ import OrderContext, { type Order } from "../context/OrderContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import AuthContext from "../context/AuthContext";
 import getImageFilename from "../utils/localStorage";
-import removeFromCart from "../context/CartContext"
 
 interface CheckoutProduct {
     productId: string;

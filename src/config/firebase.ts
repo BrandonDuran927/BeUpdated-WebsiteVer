@@ -19,4 +19,6 @@ const auth = getAuth(app);
 const database = getDatabase(app);
 const firestore = getFirestore(app);
 
+console.log("✅ Firebase initialized successfully!"); // ✅ Debugging Firestore initialization
+
 export { auth, database, firestore, ref, set };

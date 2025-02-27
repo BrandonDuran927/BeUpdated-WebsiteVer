@@ -19,10 +19,21 @@ const Login: React.FC = () => {
     const isAuthenticated = !!user;
 
     useEffect(() => {
-        if (isAuthenticated) {
-            navigate('/');
+        console.log("🔍 Checking user:", user);
+        console.log("🔍 Checking role:", authContext.role);
+
+        if (user && authContext.role) {  // Ensure role is not null
+            if (authContext.role === "admin") {
+                console.log("✅ Redirecting to Admin Dashboard");
+                navigate('/admin/dashboard');
+            } else {
+                console.log("✅ Redirecting to Home Page");
+                navigate('/');
+            }
         }
-    }, [isAuthenticated, navigate]);
+    }, [user, authContext.role, navigate]);
+
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -37,12 +48,13 @@ const Login: React.FC = () => {
 
         try {
             await loginUser(email, password);
-            navigate('/');
+            console.log("✅ Login successful, waiting for role to be fetched...");
         } catch (err: any) {
             setErrorMessage(err.message || 'Invalid credentials. Please try again.');
         } finally {
             setIsLoading(false);
         }
+
     };
 
     return (
@@ -54,7 +66,7 @@ const Login: React.FC = () => {
                             <div className="text-center mb-4">
                                 <h2 className="fw-bold">Sign In</h2>
                                 <p className="text-muted">
-                                    Access your National University student account
+                                    Access your National University - Fairview branch student account
                                 </p>
                             </div>
 
@@ -122,12 +134,6 @@ const Login: React.FC = () => {
                                 </p>
                             </div>
                         </div>
-                    </div>
-
-                    <div className="text-center mt-3">
-                        <small className="text-muted">
-                            For testing, use: student@students.nu-fairview.edu.ph / Password123!
-                        </small>
                     </div>
                 </div>
             </div>

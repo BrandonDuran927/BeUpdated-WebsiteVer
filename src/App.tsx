@@ -8,7 +8,6 @@ import { WishlistProvider } from './context/WishlistContext';
 import { OrderProvider } from './context/OrderContext';
 import { ProductProvider } from './context/ProductContext';
 
-// App.tsx
 function App() {
   return (
     <AuthProvider>

@@ -72,7 +72,6 @@ export const WishlistProvider: React.FC<WishlistProviderProps> = ({ children }) 
         try {
             const wishlistRef = collection(firestore, `users/${userId}/wishlist`);
 
-            // 🔹 Generate a new Firestore document reference with a unique ID
             const newWishlistRef = doc(wishlistRef);
             const generatedId = newWishlistRef.id; // ✅ Firestore-generated ID
 

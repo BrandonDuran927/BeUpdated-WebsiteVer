@@ -1,46 +1,46 @@
-import { createContext, ReactNode, useEffect, useState } from "react";
-import { auth, firestore } from "../config/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import React, { createContext, useState, useEffect, ReactNode } from "react";
+import { auth, database, ref } from "../config/firebase";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { get } from "firebase/database";
 
 interface AdminContextType {
-    isAdmin: boolean;
-    adminLogin: (email: string, password: string) => Promise<void>;
-    adminLogout: () => Promise<void>;
+    admin: User | null;
+    loading: boolean;
+    logoutAdmin: () => Promise<void>;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [admin, setAdmin] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const checkAdmin = async () => {
-            const user = auth.currentUser;
-            if (user) {
-                const adminRef = doc(firestore, "admins", user.uid);
-                const adminSnap = await getDoc(adminRef);
-                setIsAdmin(adminSnap.exists()); // ✅ If doc exists, user is an admin
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                const userRef = ref(database, `users/${currentUser.uid}`);
+                const snapshot = await get(userRef);
+
+                if (snapshot.exists() && snapshot.val().role === "admin") {
+                    setAdmin(currentUser);
+                } else {
+                    setAdmin(null);
+                }
+            } else {
+                setAdmin(null);
             }
-        };
-        checkAdmin();
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
     }, []);
 
-    const adminLogin = async (email: string, password: string) => {
-        try {
-            // await auth.signInWithEmailAndPassword(email, password);
-            // await checkAdmin();
-        } catch (error) {
-            console.error("Admin login failed:", error);
-        }
-    };
-
-    const adminLogout = async () => {
-        await auth.signOut();
-        setIsAdmin(false);
+    const logoutAdmin = async () => {
+        await signOut(auth);
     };
 
     return (
-        <AdminContext.Provider value={{ isAdmin, adminLogin, adminLogout }}>
+        <AdminContext.Provider value={{ admin, loading, logoutAdmin }}>
             {children}
         </AdminContext.Provider>
     );

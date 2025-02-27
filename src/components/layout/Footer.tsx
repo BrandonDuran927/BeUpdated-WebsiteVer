@@ -52,7 +52,7 @@ const Footer: React.FC = () => {
                     </div>
 
                     <div className="col-md-2">
-                        <h5 style={{ color: '#FEE055' }}>Contact</h5>
+                        <h5 style={{ color: '#FEE055' }}>Location</h5>
                         <p className="small">
                             National University<br />
                             Fairview, Quezon City<br />
