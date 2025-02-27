@@ -4,21 +4,27 @@ import { firestore, database } from "../../config/firebase";
 import { collection, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
 import { ref, get } from "firebase/database";
 
+interface Product {
+    productId?: string;
+    productName: string;
+    quantity: number;
+    productPrice: number;
+    status: string;
+    approval: boolean;
+    savedAt: string;
+    updatedAt?: string;
+    productColor?: string;
+    productSize?: string;
+}
+
 interface Order {
     id: string;
     userId: string;
     userEmail: string;
     paymentMethod: string;
     date: string;
-    savedAt: string; // Add savedAt to the interface
-    products: {
-        productName: string;
-        quantity: number;
-        productPrice: number;
-        status: string;
-        approval: boolean;
-        savedAt: string; // Make sure it's in the products as well
-    }[];
+    savedAt: string;
+    products: Product[];
 }
 
 const ORDERS_PER_PAGE = 10;
@@ -32,8 +38,8 @@ const ManageOrders: React.FC = () => {
 
     const sortOrders = (ordersToSort: Order[]) => {
         return [...ordersToSort].sort((a, b) => {
-            const timeA = a.products[0]?.savedAt || "0";
-            const timeB = b.products[0]?.savedAt || "0";
+            const timeA = a.savedAt || "0";
+            const timeB = b.savedAt || "0";
 
             return sortDirection === "desc"
                 ? timeB.localeCompare(timeA)
@@ -51,10 +57,6 @@ const ManageOrders: React.FC = () => {
     const startIndex = (currentPage - 1) * ORDERS_PER_PAGE;
     const endIndex = startIndex + ORDERS_PER_PAGE;
     const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
-
-    const toggleSortDirection = () => {
-        setSortDirection(sortDirection === "desc" ? "asc" : "desc");
-    };
 
     const nextPage = () => {
         if (currentPage < totalPages) {
@@ -100,7 +102,6 @@ const ManageOrders: React.FC = () => {
     useEffect(() => {
         console.log("📡 Setting up real-time listener for orders...");
         const unsubscribeUsers = onSnapshot(collection(firestore, "users"), (usersSnapshot) => {
-            let allOrders: Order[] = [];
             let unsubscribeOrdersList: (() => void)[] = [];
 
             usersSnapshot.docs.forEach((userDoc) => {
@@ -127,19 +128,30 @@ const ManageOrders: React.FC = () => {
                             userEmail: userEmails[userId] || "Fetching...",
                             paymentMethod: orderData.paymentMethod || "Unknown",
                             date: orderData.timestamp ? new Date(orderData.timestamp).toLocaleDateString() : "Unknown",
-                            savedAt: products[0]?.savedAt || "0", // Add savedAt for sorting
-                            products: products.map((product: any) => ({
+                            savedAt: orderData.timestamp?.toString() || "0",
+                            products: products.map((product: any, index: number) => ({
+                                productId: product.productId || `product-${index}`,
                                 productName: product.productName || "Unknown",
                                 quantity: product.quantity || 0,
                                 productPrice: product.productPrice || 0,
                                 status: product.status || "pending",
                                 approval: product.approval || false,
-                                savedAt: product.savedAt || "0" // Ensure savedAt is included
+                                savedAt: product.savedAt || "0",
+                                updatedAt: product.updatedAt || "",
+                                productColor: product.productColor || "",
+                                productSize: product.productSize || ""
                             })),
                         });
                     });
 
-                    setOrders((prevOrders) => [...prevOrders.filter(order => order.userId !== userId), ...newOrders]);
+                    setOrders((prevOrders) => {
+                        const filteredPrevOrders = prevOrders.filter(order =>
+                            !newOrders.some(newOrder =>
+                                newOrder.userId === order.userId && newOrder.id === order.id
+                            )
+                        );
+                        return [...filteredPrevOrders, ...newOrders];
+                    });
                 });
 
                 unsubscribeOrdersList.push(unsubscribeOrders);
@@ -155,13 +167,13 @@ const ManageOrders: React.FC = () => {
             console.log("🛑 Unsubscribing from Firestore user listener...");
             unsubscribeUsers();
         };
-    }, []);
+    }, [userEmails]);
 
-    const updateOrderApproval = async (userId: string, orderId: string, newApproval: boolean) => {
+    const updateProductApproval = async (userId: string, orderId: string, productIndex: number, newApproval: boolean) => {
         try {
             const orderRef = doc(firestore, `users/${userId}/orders/${orderId}`);
 
-            // Get the current order data before updating
+            // Get the current order data
             const orderSnapshot = await getDoc(orderRef);
             if (!orderSnapshot.exists()) {
                 console.error("❌ Order not found!");
@@ -169,27 +181,32 @@ const ManageOrders: React.FC = () => {
             }
 
             const orderData = orderSnapshot.data();
-            const updatedProducts = orderData.products.map((product: any) => ({
-                ...product, // Keep all existing fields
-                approval: newApproval, // Change only the approval field
-            }));
+            const products = [...orderData.products]; // Create a copy to modify
 
-            // Update Firestore document
-            await updateDoc(orderRef, {
-                products: updatedProducts, // Preserve all fields, update only approval
-            });
+            // Update only the specific product's approval
+            if (products[productIndex]) {
+                products[productIndex] = {
+                    ...products[productIndex],
+                    approval: newApproval,
+                    updatedAt: new Date().toISOString()
+                };
 
-            console.log(`✅ Order ${orderId} approval set to ${newApproval}`);
+                // Update Firestore document
+                await updateDoc(orderRef, { products });
+                console.log(`✅ Product #${productIndex} in Order ${orderId} approval set to ${newApproval}`);
+            } else {
+                console.error(`❌ Product at index ${productIndex} not found in order ${orderId}`);
+            }
         } catch (error) {
-            console.error("❌ Error updating order approval:", error);
+            console.error("❌ Error updating product approval:", error);
         }
     };
 
-    const updateOrderStatus = async (userId: string, orderId: string, newStatus: string) => {
+    const updateProductStatus = async (userId: string, orderId: string, productIndex: number, newStatus: string) => {
         try {
             const orderRef = doc(firestore, `users/${userId}/orders/${orderId}`);
 
-            // Get current order data
+            // Get the current order data
             const orderSnapshot = await getDoc(orderRef);
             if (!orderSnapshot.exists()) {
                 console.error("❌ Order not found!");
@@ -197,27 +214,40 @@ const ManageOrders: React.FC = () => {
             }
 
             const orderData = orderSnapshot.data();
-            const updatedProducts = orderData.products.map((product: any) => ({
-                ...product, // Preserve all existing fields
-                status: newStatus, // Change only status
-                updatedAt: new Date().toISOString(), // Update timestamp
-            }));
+            const products = [...orderData.products]; // Create a copy to modify
 
-            // Update Firestore document
-            await updateDoc(orderRef, {
-                products: updatedProducts, // Preserve fields, update only status
-            });
+            // Update only the specific product's status
+            if (products[productIndex]) {
+                products[productIndex] = {
+                    ...products[productIndex],
+                    status: newStatus,
+                    updatedAt: new Date().toISOString()
+                };
 
-            console.log(`✅ Order ${orderId} status updated to ${newStatus}`);
+                // Update Firestore document
+                await updateDoc(orderRef, { products });
+                console.log(`✅ Product #${productIndex} in Order ${orderId} status updated to ${newStatus}`);
+            } else {
+                console.error(`❌ Product at index ${productIndex} not found in order ${orderId}`);
+            }
         } catch (error) {
-            console.error("❌ Error updating order status:", error);
+            console.error("❌ Error updating product status:", error);
+        }
+    };
+
+    const getStatusBadgeColor = (status: string) => {
+        switch (status) {
+            case "pending": return "warning";
+            case "completed": return "success";
+            case "cancelled": return "danger";
+            default: return "secondary";
         }
     };
 
     return (
         <Container className="mt-4">
             <h1 className="text-primary">Manage Orders</h1>
-            <p className="text-muted">View, approve, and cancel orders in real-time.</p>
+            <p className="text-muted">View, approve, and cancel individual products in orders in real-time.</p>
 
             {/* Filter and Sort Controls */}
             <div className="d-flex justify-content-between mb-3">
@@ -264,71 +294,102 @@ const ManageOrders: React.FC = () => {
                     <thead className="table-primary">
                         <tr>
                             <th>Order ID</th>
-                            <th>User Email</th>
-                            <th>Payment Method</th>
-                            <th>Products</th>
+                            <th>User</th>
+                            <th>Payment</th>
+                            <th>Product</th>
+                            <th>Details</th>
                             <th>Status</th>
-                            <th>Change Status</th>
-                            <th>Change Approval</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {paginatedOrders.length > 0 ? (
-                            paginatedOrders.map((order) => (
-                                <tr key={order.id}>
-                                    <td>{order.id}</td>
-                                    <td>{userEmails[order.userId] || "Fetching..."}</td>
-                                    <td>{order.paymentMethod}</td>
-                                    <td>
-                                        {order.products.map((product, index) => (
-                                            <div key={index}>
-                                                {product.productName} - {product.quantity} pcs - ₱{product.productPrice}
-                                            </div>
-                                        ))}
-                                    </td>
-                                    <td>
-                                        <Badge
-                                            bg={order.products[0].status === "pending" ? "warning" :
-                                                order.products[0].status === "completed" ? "success" : "danger"}
-                                            className="fw-bold"
-                                        >
-                                            {order.products[0].status.toUpperCase()}
-                                        </Badge>
-                                    </td>
-                                    <td>
-                                        <Form.Select
-                                            value={order.products[0].status}
-                                            onChange={(e) => updateOrderStatus(order.userId, order.id, e.target.value)}
-                                        >
-                                            <option value="pending">Pending</option>
-                                            <option value="completed">Completed</option>
-                                            <option value="cancelled">Cancelled</option>
-                                        </Form.Select>
-                                    </td>
-                                    <td>
-                                        {!order.products[0].approval ? (
-                                            <Button
-                                                variant="success"
-                                                size="sm"
-                                                onClick={() => updateOrderApproval(order.userId, order.id, true)}
-                                            >
-                                                Approve
-                                            </Button>
+                            paginatedOrders.flatMap((order) => (
+                                // Flatten the array to show each product as a separate row
+                                order.products.map((product, productIndex) => (
+                                    <tr key={`${order.id}-${productIndex}`}>
+                                        {/* Only show order ID, user email, and payment method for the first product */}
+                                        {productIndex === 0 ? (
+                                            <>
+                                                <td rowSpan={order.products.length}>{order.id}</td>
+                                                <td rowSpan={order.products.length}>
+                                                    {userEmails[order.userId] || "Fetching..."}
+                                                    <div className="text-muted small">Order Date: {order.date}</div>
+                                                </td>
+                                                <td rowSpan={order.products.length}>{order.paymentMethod}</td>
+                                            </>
                                         ) : (
-                                            <Button
-                                                variant="danger"
-                                                size="sm"
-                                                onClick={() => updateOrderApproval(order.userId, order.id, false)}
-                                            >
-                                                Disapprove
-                                            </Button>
+                                            // These cells are hidden for non-first products due to rowSpan above
+                                            <></>
                                         )}
-                                    </td>
-                                </tr>
+
+                                        {/* Product details - shown for each product */}
+                                        <td>
+                                            {product.productName}
+                                            {product.productColor && <div className="small">Color: {product.productColor}</div>}
+                                            {product.productSize && <div className="small">Size: {product.productSize}</div>}
+                                        </td>
+
+                                        <td>
+                                            Quantity: {product.quantity} pcs
+                                            <div>Price: ₱{product.productPrice}</div>
+                                            <div className="small text-muted">Item Total: ₱{product.quantity * product.productPrice}</div>
+                                        </td>
+
+                                        <td>
+                                            <Badge
+                                                bg={getStatusBadgeColor(product.status)}
+                                                className="fw-bold mb-2 d-block"
+                                            >
+                                                {product.status.toUpperCase()}
+                                            </Badge>
+                                            {product.updatedAt && (
+                                                <small className="text-muted d-block">
+                                                    Updated: {new Date(product.updatedAt).toLocaleString()}
+                                                </small>
+                                            )}
+                                        </td>
+
+                                        <td>
+                                            <div className="mb-2">
+                                                <Form.Select
+                                                    size="sm"
+                                                    value={product.status}
+                                                    onChange={(e) => updateProductStatus(order.userId, order.id, productIndex, e.target.value)}
+                                                    className="mb-2"
+                                                >
+                                                    <option value="pending">Pending</option>
+                                                    <option value="completed">Completed</option>
+                                                    <option value="cancelled">Cancelled</option>
+                                                </Form.Select>
+                                            </div>
+
+                                            {!product.approval ? (
+                                                <Button
+                                                    variant="success"
+                                                    size="sm"
+                                                    className="w-100"
+                                                    onClick={() => updateProductApproval(order.userId, order.id, productIndex, true)}
+                                                >
+                                                    Approve
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    variant="danger"
+                                                    size="sm"
+                                                    className="w-100"
+                                                    onClick={() => updateProductApproval(order.userId, order.id, productIndex, false)}
+                                                >
+                                                    Disapprove
+                                                </Button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={8} className="text-center text-muted">No orders found.</td>
+                                <td colSpan={7} className="text-center text-muted">No orders found.</td>
                             </tr>
                         )}
                     </tbody>
