@@ -9,8 +9,7 @@ const Navbar: React.FC = () => {
     const authContext = useContext(AuthContext);
     const { getItemCount } = useContext(CartContext);
     const { wishlistItems } = useContext(WishlistContext);
-    const orderContext = useContext(OrderContext)
-
+    const orderContext = useContext(OrderContext);
 
     const [searchQuery, setSearchQuery] = useState('');
     const navigate = useNavigate();
@@ -19,8 +18,7 @@ const Navbar: React.FC = () => {
         throw new Error("Auth context must be used within an AuthProvider");
     }
 
-    const { orders } = orderContext; // ✅ Retrieve orders from OrderContext
-
+    const { orders } = orderContext;
     const { user, logoutUser } = authContext;
     const isAuthenticated = !!user;
 
@@ -31,8 +29,10 @@ const Navbar: React.FC = () => {
         }
     };
 
-    // ✅ Count the number of orders (only show badge for pending orders)
-    const pendingOrdersCount = orders.filter(order => order.products.some(product => product.status === "pending")).length;
+    // ✅ Prevent error by checking if products is an array before using .some()
+    const pendingOrdersCount = orders.filter(order =>
+        Array.isArray(order.products) && order.products.some(product => product.status === "pending")
+    ).length;
 
     return (
         <nav className="navbar navbar-expand-lg navbar-dark fixed-top" style={{ backgroundColor: '#1434A4' }}>
@@ -100,7 +100,7 @@ const Navbar: React.FC = () => {
                                 <li className="nav-item">
                                     <Link className="nav-link position-relative" to="/orders">
                                         Orders
-                                        {pendingOrdersCount > 0 && ( // ✅ Show badge for pending orders
+                                        {pendingOrdersCount > 0 && (
                                             <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill" style={{ backgroundColor: '#FEE055', color: '#1434A4' }}>
                                                 {pendingOrdersCount}
                                             </span>

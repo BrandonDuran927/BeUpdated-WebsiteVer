@@ -2,17 +2,17 @@ import React, { useContext } from "react";
 import { Navbar, Nav, Container, Button } from "react-bootstrap";
 import { Link, useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
-import { auth } from "../../../config/firebase"; // ✅ Import Firebase Auth
-import AuthContext from "../../../context/AuthContext"; // ✅ Ensure AuthContext is available
+import { auth } from "../../../config/firebase";
+import AuthContext from "../../../context/AuthContext";
 
 const AdminNavbar: React.FC = () => {
     const navigate = useNavigate();
-    const authContext = useContext(AuthContext); // Get auth context
+    const authContext = useContext(AuthContext);
 
     const handleLogout = async () => {
         try {
-            await signOut(auth); // ✅ Logs out from Firebase
-            navigate("/login"); // ✅ Redirects to login page after logout
+            await signOut(auth);
+            navigate("/login");
         } catch (error) {
             console.error("❌ Error logging out:", error);
         }
@@ -48,7 +48,7 @@ const AdminNavbar: React.FC = () => {
                             Profile
                         </Nav.Link>
 
-                        {/* Logout Button (Proper Logout) */}
+                        {/* Logout Button */}
                         <Button variant="warning" className="fw-bold text-dark px-3 py-2" onClick={handleLogout}>
                             Logout
                         </Button>

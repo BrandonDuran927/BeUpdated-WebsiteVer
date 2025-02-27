@@ -38,8 +38,8 @@ const AdminRoutes: React.FC = () => {
             <main className="min-h-screen pt-16 pb-20">
                 <Routes>
                     <Route path="dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
-                    <Route path="products" element={<AdminProtectedRoute><ManageProducts /></AdminProtectedRoute>} />
                     <Route path="orders" element={<AdminProtectedRoute><ManageOrders /></AdminProtectedRoute>} />
+                    <Route path="products" element={<AdminProtectedRoute><ManageProducts /></AdminProtectedRoute>} />
                     <Route path="profile" element={<AdminProtectedRoute><AdminProfile /></AdminProtectedRoute>} />
                 </Routes>
             </main>

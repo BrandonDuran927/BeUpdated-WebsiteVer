@@ -29,8 +29,8 @@ const Orders: React.FC = () => {
 
     // ✅ Sort orders based on the most recent `savedAt` product
     const sortedOrders = [...orders].sort((a, b) => {
-        const latestProductA = Math.max(...a.products.map(product => new Date(product.savedAt).getTime()));
-        const latestProductB = Math.max(...b.products.map(product => new Date(product.savedAt).getTime()));
+        const latestProductA = Math.max(...(Array.isArray(a.products) ? a.products.map(product => new Date(product.savedAt).getTime()) : [0]));
+        const latestProductB = Math.max(...(Array.isArray(b.products) ? b.products.map(product => new Date(product.savedAt).getTime()) : [0]));
         return latestProductB - latestProductA; // Descending order (newest first)
     });
 
@@ -51,67 +51,64 @@ const Orders: React.FC = () => {
                             </div>
 
                             {/* Order Items */}
-                            {order.products
-                                .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()) // ✅ Sort products inside each order
-                                .map((item) => (
-                                    <div key={item.productId} className="d-flex align-items-center text-dark mb-3 p-2 border rounded">
-                                        <img
-                                            src={`/public/images/products/${getImageFilename(item.productName)}` || "/default-image.png"}
-                                            alt={item.productName}
-                                            style={{ width: "70px", height: "70px", borderRadius: "5px", marginRight: "15px" }}
-                                        />
+                            {(Array.isArray(order.products) ? order.products : []).map((item) => (
+                                <div key={item.productId} className="d-flex align-items-center text-dark mb-3 p-2 border rounded">
+                                    <img
+                                        src={`/public/images/products/${getImageFilename(item.productName)}` || "/default-image.png"}
+                                        alt={item.productName}
+                                        style={{ width: "70px", height: "70px", borderRadius: "5px", marginRight: "15px" }}
+                                    />
 
-                                        <div className="flex-grow-1">
-                                            <h6 className="mb-1">{item.productName}</h6>
-                                            {item.productSize && <p className="mb-0"><strong>Size:</strong> {item.productSize}</p>}
-                                            {item.productColor && (
-                                                <p className="mb-0">
-                                                    <strong>Color:</strong>{" "}
-                                                    <span style={{
-                                                        backgroundColor: item.productColor === "Black" ? "gray" : item.productColor,
-                                                        padding: "3px 10px",
-                                                        borderRadius: "5px"
-                                                    }}>{item.productColor}</span>
-                                                </p>
-                                            )}
-                                            <p className="mb-0"><strong>Quantity:</strong> {item.quantity}</p>
-
-                                            {/* 🔹 Status Indicator */}
+                                    <div className="flex-grow-1">
+                                        <h6 className="mb-1">{item.productName}</h6>
+                                        {item.productSize && <p className="mb-0"><strong>Size:</strong> {item.productSize}</p>}
+                                        {item.productColor && (
                                             <p className="mb-0">
-                                                <strong>Status:</strong>{" "}
-                                                <span className={`badge ${item.status === "completed" ? "bg-success" : item.status === "pending" ? "bg-warning" : "bg-danger"}`}>
-                                                    {item.status}
-                                                </span>
+                                                <strong>Color:</strong>{" "}
+                                                <span style={{
+                                                    backgroundColor: item.productColor === "Black" ? "gray" : item.productColor,
+                                                    padding: "3px 10px",
+                                                    borderRadius: "5px"
+                                                }}>{item.productColor}</span>
                                             </p>
-
-                                            {/* 🔹 Display Cancellation or Pickup Time */}
-                                            {item.status !== "pending" && item.updatedAt && (
-                                                <p className="mb-0" style={{ fontSize: "0.85rem" }}>
-                                                    {item.status === "cancelled"
-                                                        ? <strong>Cancelled on:</strong>
-                                                        : <strong>Picked up on:</strong>}{" "}
-                                                    {new Date(item.updatedAt).toLocaleString()}
-                                                </p>
-                                            )}
-
-                                            {/* 🔹 Timestamp (Saved At) */}
-                                            <p className="mb-0" style={{ fontSize: "0.85rem" }}>
-                                                <strong>Ordered on:</strong> {new Date(item.savedAt).toLocaleString()}
-                                            </p>
-                                        </div>
-
-                                        {/* 🔹 Cancel Button for Individual Items */}
-                                        {item.status === "pending" && !item.approval && (
-                                            <button
-                                                className="btn btn-danger btn-sm"
-                                                onClick={() => handleCancelItem(order.id!, item.productId, item.status)}
-                                            >
-                                                Cancel Item
-                                            </button>
                                         )}
+                                        <p className="mb-0"><strong>Quantity:</strong> {item.quantity}</p>
+
+                                        {/* 🔹 Status Indicator */}
+                                        <p className="mb-0">
+                                            <strong>Status:</strong>{" "}
+                                            <span className={`badge ${item.status === "completed" ? "bg-success" : item.status === "pending" ? "bg-warning" : "bg-danger"}`}>
+                                                {item.status}
+                                            </span>
+                                        </p>
+
+                                        {/* 🔹 Display Cancellation or Pickup Time */}
+                                        {item.status !== "pending" && item.updatedAt && (
+                                            <p className="mb-0" style={{ fontSize: "0.85rem" }}>
+                                                {item.status === "cancelled"
+                                                    ? <strong>Cancelled on:</strong>
+                                                    : <strong>Picked up on:</strong>}{" "}
+                                                {new Date(item.updatedAt).toLocaleString()}
+                                            </p>
+                                        )}
+
+                                        {/* 🔹 Timestamp (Saved At) */}
+                                        <p className="mb-0" style={{ fontSize: "0.85rem" }}>
+                                            <strong>Ordered on:</strong> {new Date(item.savedAt).toLocaleString()}
+                                        </p>
                                     </div>
-                                ))
-                            }
+
+                                    {/* 🔹 Cancel Button for Individual Items */}
+                                    {item.status === "pending" && !item.approval && (
+                                        <button
+                                            className="btn btn-danger btn-sm"
+                                            onClick={() => handleCancelItem(order.id!, item.productId, item.status)}
+                                        >
+                                            Cancel Item
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
 
                             {/* 🔹 View Order Button */}
                             <div className="mt-3 text-end">
