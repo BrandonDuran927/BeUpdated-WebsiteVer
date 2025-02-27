@@ -44,9 +44,6 @@ const AdminNavbar: React.FC = () => {
                         <Nav.Link as={Link} to="/admin/orders" className="text-light fw-semibold">
                             Manage Orders
                         </Nav.Link>
-                        <Nav.Link as={Link} to="/admin/profile" className="text-light fw-semibold">
-                            Profile
-                        </Nav.Link>
 
                         {/* Logout Button */}
                         <Button variant="warning" className="fw-bold text-dark px-3 py-2" onClick={handleLogout}>

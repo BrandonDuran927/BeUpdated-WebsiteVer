@@ -1,46 +1,43 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import AuthContext from '../context/AuthContext';
+import React, { useState, useContext, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import AuthContext from "../context/AuthContext";
 
 const Login: React.FC = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [errorMessage, setErrorMessage] = useState('');
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [errorMessage, setErrorMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
     const authContext = useContext(AuthContext);
     const navigate = useNavigate();
 
     if (!authContext) {
-        throw new Error("Auth context must be used within an AuthProvider");
+        throw new Error("AuthContext must be used within an AuthProvider");
     }
 
-    const { user, loginUser } = authContext;
-    const isAuthenticated = !!user;
+    const { user, role, loginUser, isInitializing } = authContext;
 
     useEffect(() => {
         console.log("🔍 Checking user:", user);
-        console.log("🔍 Checking role:", authContext.role);
+        console.log("🔍 Checking role:", role);
 
-        if (user && authContext.role) {  // Ensure role is not null
-            if (authContext.role === "admin") {
+        if (!isInitializing && user && role) {  // Ensure role is fully loaded before redirecting
+            if (role === "admin") {
                 console.log("✅ Redirecting to Admin Dashboard");
-                navigate('/admin/dashboard');
+                navigate("/admin/dashboard", { replace: true });
             } else {
                 console.log("✅ Redirecting to Home Page");
-                navigate('/');
+                navigate("/", { replace: true });
             }
         }
-    }, [user, authContext.role, navigate]);
-
-
+    }, [user, role, isInitializing, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setErrorMessage('');
+        setErrorMessage("");
 
         if (!email || !password) {
-            setErrorMessage('Please enter both email and password');
+            setErrorMessage("Please enter both email and password");
             return;
         }
 
@@ -50,11 +47,10 @@ const Login: React.FC = () => {
             await loginUser(email, password);
             console.log("✅ Login successful, waiting for role to be fetched...");
         } catch (err: any) {
-            setErrorMessage(err.message || 'Invalid credentials. Please try again.');
+            setErrorMessage(err.message || "Invalid credentials. Please try again.");
         } finally {
             setIsLoading(false);
         }
-
     };
 
     return (
@@ -78,7 +74,9 @@ const Login: React.FC = () => {
 
                             <form onSubmit={handleSubmit}>
                                 <div className="mb-3">
-                                    <label htmlFor="email" className="form-label">Student Email</label>
+                                    <label htmlFor="email" className="form-label">
+                                        Student Email
+                                    </label>
                                     <input
                                         type="email"
                                         className="form-control"
@@ -94,7 +92,9 @@ const Login: React.FC = () => {
                                 </div>
 
                                 <div className="mb-3">
-                                    <label htmlFor="password" className="form-label">Password</label>
+                                    <label htmlFor="password" className="form-label">
+                                        Password
+                                    </label>
                                     <input
                                         type="password"
                                         className="form-control"
@@ -110,7 +110,7 @@ const Login: React.FC = () => {
                                     <button
                                         type="submit"
                                         className="btn btn-lg"
-                                        style={{ backgroundColor: '#1434A4', color: '#FEE055' }}
+                                        style={{ backgroundColor: "#1434A4", color: "#FEE055" }}
                                         disabled={isLoading}
                                     >
                                         {isLoading ? (
@@ -119,7 +119,7 @@ const Login: React.FC = () => {
                                                 <span className="ms-2">Signing in...</span>
                                             </span>
                                         ) : (
-                                            'Sign In'
+                                            "Sign In"
                                         )}
                                     </button>
                                 </div>
@@ -127,8 +127,8 @@ const Login: React.FC = () => {
 
                             <div className="text-center mt-4">
                                 <p>
-                                    Don't have an account?{' '}
-                                    <Link to="/register" className="fw-bold" style={{ color: '#1434A4' }}>
+                                    Don't have an account?{" "}
+                                    <Link to="/register" className="fw-bold" style={{ color: "#1434A4" }}>
                                         Sign Up
                                     </Link>
                                 </p>

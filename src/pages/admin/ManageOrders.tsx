@@ -269,7 +269,7 @@ const ManageOrders: React.FC = () => {
                             <th>Products</th>
                             <th>Status</th>
                             <th>Change Status</th>
-                            <th>Actions</th>
+                            <th>Change Approval</th>
                         </tr>
                     </thead>
                     <tbody>
